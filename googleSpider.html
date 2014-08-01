@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Place searches</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+        html, body, #map-canvas {
+            height: 100%;
+            margin: 0px;
+            padding: 0px
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&libraries=places"></script>
+    <script src="jquery-2.1.1.min.js"></script>
+    <script>
+
+
+
+    var map;
+    var infowindow;
+    var nextAddress = 0;
+    var delay = 1000;
+    var gridSize = 0.04;
+    var bottom = 33.696626;
+    var topV = 34.337472;
+    var left = -118.686391;
+    var right = -118.174153;
+
+    var widthCount = (right - left) / gridSize;
+    var heightCount = (topV - bottom) / gridSize;
+    var gridCount = widthCount * heightCount;
+
+    function initialize() {
+        var pyrmont = new google.maps.LatLng(33.759774, -118.186480);
+        var sw = new google.maps.LatLng(33.759774, -118.186480);
+        var ne = new google.maps.LatLng(33.803148, -118.149144);
+        var ranges = new google.maps.LatLngBounds(sw,ne);
+        map = new google.maps.Map(document.getElementById('map-canvas'), {
+            center: pyrmont,
+            zoom: 15
+        });
+
+        var request = {
+            location: pyrmont,
+            radius: 100,
+            types: ['restaurant']
+        };
+        var request2 = {
+            bounds:ranges,
+            types: ['restaurant']
+        };
+        infowindow = new google.maps.InfoWindow();
+
+        nextGrid();
+
+        }
+
+        function nextGrid(){
+            setTimeout(function() {
+                //your code to be executed after 1 seconds
+                widthIndex = Math.floor(nextAddress / heightCount);
+                heightIndex = nextAddress % heightCount;
+                var sw = new google.maps.LatLng(33.696626 + heightIndex * gridSize, -118.686391 + widthIndex * gridSize);
+                var ne = new google.maps.LatLng(33.696626 + (heightIndex + 1) * gridSize, -118.686391 + (widthIndex + 1) * gridSize);
+                var grid = new google.maps.LatLngBounds(sw,ne);
+                var request3 = {
+                    bounds:grid,
+                    types: ['art']
+                };
+                var service = new google.maps.places.PlacesService(map);
+                service.nearbySearch(request3, callback);
+
+            },delay);
+            nextAddress++;
+        }
+
+        function callback(results, status) {
+            var stringValue = "";
+            if (status == google.maps.places.PlacesServiceStatus.OK) {
+                for (var i = 0; i < results.length; i++) {
+                    stringValue = stringValue.concat(results[i].geometry.location.lat(), "	", results[i].geometry.location.lng(), "\n");
+                    //createMarker(results[i]) ;
+                }
+                if(nextAddress < gridCount){
+                    nextGrid();
+                }
+
+            } else {
+                if (status == google.maps.GeocoderStatus.OVER_QUERY_LIMIT) {
+                    nextAddress--;
+                    delay++;
+                    nextGrid();
+                    return;
+                } else {
+                    nextGrid();
+                    return;
+                }
+
+            }
+                //alert(stringValue);
+            if(results.length == 0) {
+                return;
+            }
+            writeToServer(stringValue);
+        }
+
+        function writeToServer(stringValue){
+
+            $.ajax({
+                type: 'POST',
+                url:'http://lccpu4.cse.ust.hk/voiceSimple/serverWrite.php/',
+                data:{ value: stringValue },
+                success: function(msg){
+                }
+            });
+        }
+
+        function createMarker(place) {
+            var placeLoc = place.geometry.location;
+            var marker = new google.maps.Marker({
+                map: map,
+                position: place.geometry.location
+            });
+
+            google.maps.event.addListener(marker, 'click', function() {
+                infowindow.setContent(place.geometry.location + ':' + place.name);
+                infowindow.open(map, this);
+            });
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+
+    </script>
+</head>
+<body>
+<div id="map-canvas"></div>
+</body>
+</html>
